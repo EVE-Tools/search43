@@ -1,0 +1,6 @@
+pipeline:
+  docker:
+      repo: evetools/search43
+      tag:
+        - latest
+        - ${DRONE_BRANCH}
