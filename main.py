@@ -2,6 +2,10 @@ import falcon
 import requests
 import json
 
+from whoosh.fields import Schema, NGRAMWORDS
+from whoosh.filedb.filestore import RamStorage
+from whoosh.qparser import QueryParser
+
 
 class SearchResource(object):
 
@@ -20,12 +24,19 @@ class SearchResource(object):
         # Load items into dict and create name list
         # Names are stored in lower case
         self.types = {}
-        self.name_list = []
+
+        # Whoosh index to speedup queries
+        self.ix = RamStorage().create_index(Schema(name=NGRAMWORDS(stored=True)))
+        self.query_parser = QueryParser("name", self.ix.schema)
+
+        writer = self.ix.writer()
 
         for item in items:
             name = item["type"]["name"].lower()
             self.types[name] = item
-            self.name_list.append(name)
+            writer.add_document(name=name)
+
+        writer.commit()
 
         print("Done!")
 
@@ -38,10 +49,12 @@ class SearchResource(object):
 
         # Convert query to lower case unicode string
         query = unicode(request.get_param('query', True), "utf-8").lower()
+        query = self.query_parser.parse(query)
 
         # Find matches and retrieve results by name from dict
-        matches = [name for name in self.name_list if query in name][:25]
-        results = [self.types[match] for match in matches]
+        with self.ix.searcher() as searcher:
+            matches = searcher.search(query, limit=25)
+            results = [self.types[match["name"]] for match in matches]
 
         # Encode JSON and send response
         encoded_results = json.dumps(results)
