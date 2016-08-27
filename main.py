@@ -7,6 +7,12 @@ from whoosh.filedb.filestore import RamStorage
 from whoosh.qparser import QueryParser
 
 
+# workaround https://bitbucket.org/mchaput/whoosh/issues/450/ramstorage-wants-tmp
+class ReallyRamStorage(RamStorage):
+    def temp_storage(self, name=None):
+        return ReallyRamStorage().create()
+
+
 class SearchResource(object):
 
     def __init__(self):
@@ -26,7 +32,7 @@ class SearchResource(object):
         self.types = {}
 
         # Whoosh index to speedup queries
-        self.ix = RamStorage().create_index(Schema(name=NGRAMWORDS(stored=True)))
+        self.ix = ReallyRamStorage().create_index(Schema(name=NGRAMWORDS(stored=True)))
         self.query_parser = QueryParser("name", self.ix.schema)
 
         writer = self.ix.writer()
