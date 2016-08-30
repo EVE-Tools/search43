@@ -9,6 +9,7 @@ RUN apt-get update && \
     apt-get dist-upgrade -y && \
     apt-get install -y --no-install-recommends build-essential && \
     pip install -r requirements.txt && \
+    pypy build.py && \
     apt-get remove --purge -y build-essential && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*

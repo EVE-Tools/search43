@@ -1,50 +1,16 @@
 import falcon
-import requests
 import json
 
-from whoosh.fields import Schema, NGRAMWORDS
-from whoosh.filedb.filestore import RamStorage
+from whoosh import index
 from whoosh.qparser import QueryParser
-
-
-# workaround https://bitbucket.org/mchaput/whoosh/issues/450/ramstorage-wants-tmp
-class ReallyRamStorage(RamStorage):
-    def temp_storage(self, name=None):
-        return ReallyRamStorage().create()
 
 
 class SearchResource(object):
 
     def __init__(self):
-        self.types = {}
-        self.name_list = []
-
-        self.refresh_types()
-
-    def refresh_types(self):
-        print("Refreshing types from CREST...")
-
-        # Get all items
-        items = get_all_items("https://crest-tq.eveonline.com/market/types/")
-
-        # Load items into dict and create name list
-        # Names are stored in lower case
-        self.types = {}
-
-        # Whoosh index to speedup queries
-        self.ix = ReallyRamStorage().create_index(Schema(name=NGRAMWORDS(stored=True)))
-        self.query_parser = QueryParser("name", self.ix.schema)
-
-        writer = self.ix.writer()
-
-        for item in items:
-            name = item["type"]["name"].lower()
-            self.types[name] = item
-            writer.add_document(name=name)
-
-        writer.commit()
-
-        print("Done!")
+        self.types = json.load(open('types.json'))
+        self.ix = index.open_dir('types.idx')
+        self.query_parser = QueryParser('name', self.ix.schema)
 
     def on_get(self, request, response):
         """
@@ -70,20 +36,6 @@ class SearchResource(object):
         response.content_type = "application/json"
         response.append_header("Access-Control-Allow-Origin", "*")
 
-
-def get_all_items(url):
-    """
-    :param url: Starting url
-    :return: All items from all pages
-    """
-    result = requests.get(url).json()
-    items = result["items"]
-
-    if "pageCount" in result.keys():
-        for page_number in range(2, result["pageCount"]+1):
-            items.extend(requests.get(url + ("?page=%d" % page_number)).json()["items"])
-
-    return items
 
 # Initialize application
 application = falcon.API()
