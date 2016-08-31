@@ -1,33 +1,16 @@
 import falcon
-import requests
 import json
+
+from whoosh import index
+from whoosh.qparser import QueryParser
 
 
 class SearchResource(object):
 
     def __init__(self):
-        self.types = {}
-        self.name_list = []
-
-        self.refresh_types()
-
-    def refresh_types(self):
-        print("Refreshing types from CREST...")
-
-        # Get all items
-        items = get_all_items("https://crest-tq.eveonline.com/market/types/")
-
-        # Load items into dict and create name list
-        # Names are stored in lower case
-        self.types = {}
-        self.name_list = []
-
-        for item in items:
-            name = item["type"]["name"].lower()
-            self.types[name] = item
-            self.name_list.append(name)
-
-        print("Done!")
+        self.types = json.load(open('types.json'))
+        self.ix = index.open_dir('types.idx')
+        self.query_parser = QueryParser('name', self.ix.schema)
 
     def on_get(self, request, response):
         """
@@ -38,10 +21,12 @@ class SearchResource(object):
 
         # Convert query to lower case unicode string
         query = unicode(request.get_param('query', True), "utf-8").lower()
+        query = self.query_parser.parse(query)
 
         # Find matches and retrieve results by name from dict
-        matches = [name for name in self.name_list if query in name][:25]
-        results = [self.types[match] for match in matches]
+        with self.ix.searcher() as searcher:
+            matches = searcher.search(query, limit=25)
+            results = [self.types[match["name"]] for match in matches]
 
         # Encode JSON and send response
         encoded_results = json.dumps(results)
@@ -51,20 +36,6 @@ class SearchResource(object):
         response.content_type = "application/json"
         response.append_header("Access-Control-Allow-Origin", "*")
 
-
-def get_all_items(url):
-    """
-    :param url: Starting url
-    :return: All items from all pages
-    """
-    result = requests.get(url).json()
-    items = result["items"]
-
-    if "pageCount" in result.keys():
-        for page_number in range(2, result["pageCount"]+1):
-            items.extend(requests.get(url + ("?page=%d" % page_number)).json()["items"])
-
-    return items
 
 # Initialize application
 application = falcon.API()
