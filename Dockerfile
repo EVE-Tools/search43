@@ -15,7 +15,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ENV NUM_WORKERS=2
+ENV PORT=8000
 
-EXPOSE 8000
-
-ENTRYPOINT ["sh", "-c", "/usr/local/bin/gunicorn main:application -b :8000 --workers ${NUM_WORKERS} --worker-class meinheld.gmeinheld.MeinheldWorker"]
+ENTRYPOINT ["sh", "-c", "/usr/local/bin/gunicorn main:application -b :${PORT} --workers ${NUM_WORKERS} --worker-class meinheld.gmeinheld.MeinheldWorker"]
